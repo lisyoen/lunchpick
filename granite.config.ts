@@ -9,9 +9,9 @@ export default defineConfig({
   },
   web: {
     host: "localhost",
-    port: 5174,
+    port: 5173,
     commands: {
-      dev: "vite dev --port 5174",
+      dev: "vite dev --port 5173",
       build: "vite build",
     },
   },

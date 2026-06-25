@@ -1,44 +1,21 @@
-import { Button, Top } from "@toss/tds-mobile";
-import "./App.css";
+import { useState } from 'react';
+import './App.css';
+import { CreateRoomScreen } from './screens/CreateRoomScreen';
+import { HomeScreen } from './screens/HomeScreen';
+import { RoomScreen } from './screens/RoomScreen';
+import type { Screen } from './types';
 
 function App() {
-  return (
-    <>
-      <Top
-        title={<Top.TitleParagraph size={22}>오늘 뭐 먹지</Top.TitleParagraph>}
-        subtitleBottom={
-          <Top.SubtitleParagraph size={17}>
-            단톡방에서 30초 만에 점심 메뉴를 정하세요.
-          </Top.SubtitleParagraph>
-        }
-      />
+  const [screen, setScreen] = useState<Screen>({ type: 'home' });
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-          padding: "24px",
-        }}
-      >
-        <Button
-          variant="primary"
-          onClick={() => {
-            // Phase 1에서 방 만들기 기능 구현 예정
-          }}
-        >
-          방 만들기
-        </Button>
-        <Button
-          variant="weak"
-          onClick={() => {
-            // Phase 1에서 방 참여 기능 구현 예정
-          }}
-        >
-          방 코드로 참여
-        </Button>
-      </div>
-    </>
+  return (
+    <div>
+      {screen.type === 'home' && <HomeScreen onNavigate={setScreen} />}
+      {screen.type === 'create' && <CreateRoomScreen onNavigate={setScreen} />}
+      {screen.type === 'room' && (
+        <RoomScreen code={screen.code} onNavigate={setScreen} />
+      )}
+    </div>
   );
 }
 
