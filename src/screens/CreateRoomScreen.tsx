@@ -7,7 +7,7 @@ import {
   TopNavigationBackButton,
 } from '@toss/tds-mobile';
 import { useRef, useState } from 'react';
-import { createRoom, getVoterId } from '../lib/roomStore';
+import { createRoom } from '../lib/roomStore';
 import type { Screen } from '../types';
 
 interface Props {
@@ -21,7 +21,7 @@ const DEADLINE_OPTIONS = [
   { label: '2시간', value: 2 * 60 * 60 * 1000 },
 ];
 
-type Step = 'edit' | 'done';
+type Step = 'edit' | 'creating' | 'done';
 
 export function CreateRoomScreen({ onNavigate }: Props) {
   const [step, setStep] = useState<Step>('edit');
@@ -30,6 +30,7 @@ export function CreateRoomScreen({ onNavigate }: Props) {
   const [deadlineMs, setDeadlineMs] = useState(0);
   const [createdCode, setCreatedCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [createError, setCreateError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   function addCandidate() {
@@ -44,12 +45,19 @@ export function CreateRoomScreen({ onNavigate }: Props) {
     setCandidates((prev) => prev.filter((c) => c !== name));
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (candidates.length < 2) return;
-    const deadline = deadlineMs > 0 ? Date.now() + deadlineMs : undefined;
-    const room = createRoom(candidates, deadline);
-    setCreatedCode(room.code);
-    setStep('done');
+    setStep('creating');
+    setCreateError('');
+    try {
+      const deadline = deadlineMs > 0 ? Date.now() + deadlineMs : undefined;
+      const room = await createRoom(candidates, deadline);
+      setCreatedCode(room.code);
+      setStep('done');
+    } catch {
+      setCreateError('방 생성에 실패했습니다. 서버 연결을 확인해 주세요.');
+      setStep('edit');
+    }
   }
 
   async function copyCode() {
@@ -125,9 +133,6 @@ export function CreateRoomScreen({ onNavigate }: Props) {
       </div>
     );
   }
-
-  const voterId = getVoterId();
-  void voterId;
 
   return (
     <div style={{ paddingBottom: 120 }}>
@@ -257,15 +262,21 @@ export function CreateRoomScreen({ onNavigate }: Props) {
             </ChipItem>
           ))}
         </Chip>
+
+        {createError && (
+          <p style={{ color: '#F04452', fontSize: 13, marginTop: 12 }}>{createError}</p>
+        )}
       </div>
 
       <FixedBottomCTA
-        disabled={candidates.length < 2}
+        disabled={candidates.length < 2 || step === 'creating'}
         onClick={handleCreate}
       >
-        {candidates.length < 2
-          ? `메뉴 ${2 - candidates.length}개 더 추가하세요`
-          : '투표방 만들기'}
+        {step === 'creating'
+          ? '생성 중...'
+          : candidates.length < 2
+            ? `메뉴 ${2 - candidates.length}개 더 추가하세요`
+            : '투표방 만들기'}
       </FixedBottomCTA>
     </div>
   );

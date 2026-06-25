@@ -1,9 +1,11 @@
 node_modules/
+server/node_modules/
 dist/
 build/
 *.ait
 .env
 .env.*
+!.env.example
 .DS_Store
 *.log
 .granite/

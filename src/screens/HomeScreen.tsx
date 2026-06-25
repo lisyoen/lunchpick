@@ -1,7 +1,7 @@
 import { Button, List, ListRow, Spacing, Top } from '@toss/tds-mobile';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { addRecentRoom, getRecentRooms, getRoom } from '../lib/roomStore';
-import type { Screen } from '../types';
+import type { Room, Screen } from '../types';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
@@ -10,22 +10,38 @@ interface Props {
 export function HomeScreen({ onNavigate }: Props) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const recentCodes = getRecentRooms();
+  const [joining, setJoining] = useState(false);
+  const [recentRooms, setRecentRooms] = useState<Room[]>([]);
 
-  function handleJoin() {
+  useEffect(() => {
+    const codes = getRecentRooms();
+    if (codes.length === 0) return;
+    Promise.all(codes.map((c) => getRoom(c)))
+      .then((rooms) => setRecentRooms(rooms.filter((r): r is Room => r !== null)))
+      .catch(() => {});
+  }, []);
+
+  async function handleJoin() {
     const trimmed = code.trim().toUpperCase();
     if (trimmed.length !== 6) {
       setError('방 코드는 6자리입니다.');
       return;
     }
-    const room = getRoom(trimmed);
-    if (!room) {
-      setError('존재하지 않는 방 코드입니다.');
-      return;
+    setJoining(true);
+    try {
+      const room = await getRoom(trimmed);
+      if (!room) {
+        setError('존재하지 않는 방 코드입니다.');
+        return;
+      }
+      addRecentRoom(trimmed);
+      setError('');
+      onNavigate({ type: 'room', code: trimmed });
+    } catch {
+      setError('서버 연결 오류. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setJoining(false);
     }
-    setError('');
-    addRecentRoom(trimmed);
-    onNavigate({ type: 'room', code: trimmed });
   }
 
   return (
@@ -74,8 +90,8 @@ export function HomeScreen({ onNavigate }: Props) {
             }}
             onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
           />
-          <Button variant="fill" size="xlarge" onClick={handleJoin}>
-            참여
+          <Button variant="fill" size="xlarge" onClick={handleJoin} disabled={joining}>
+            {joining ? '...' : '참여'}
           </Button>
         </div>
 
@@ -84,7 +100,7 @@ export function HomeScreen({ onNavigate }: Props) {
         )}
       </div>
 
-      {recentCodes.length > 0 && (
+      {recentRooms.length > 0 && (
         <>
           <Spacing size={24} />
           <List>
@@ -99,9 +115,7 @@ export function HomeScreen({ onNavigate }: Props) {
             >
               최근 방
             </div>
-            {recentCodes.map((roomCode) => {
-              const room = getRoom(roomCode);
-              if (!room) return null;
+            {recentRooms.map((room) => {
               const preview =
                 room.candidates
                   .slice(0, 3)
@@ -110,16 +124,16 @@ export function HomeScreen({ onNavigate }: Props) {
               const status = room.closed ? '마감' : `${room.votes.length}표`;
               return (
                 <ListRow
-                  key={roomCode}
+                  key={room.code}
                   contents={
                     <ListRow.Texts
                       type="2RowTypeA"
                       top={preview}
-                      bottom={`#${roomCode} · ${status}`}
+                      bottom={`#${room.code} · ${status}`}
                     />
                   }
                   arrowType="right"
-                  onClick={() => onNavigate({ type: 'room', code: roomCode })}
+                  onClick={() => onNavigate({ type: 'room', code: room.code })}
                 />
               );
             })}

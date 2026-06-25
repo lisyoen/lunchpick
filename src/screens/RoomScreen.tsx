@@ -13,7 +13,7 @@ import {
   isClosed,
   vote,
 } from '../lib/roomStore';
-import type { Screen } from '../types';
+import type { Room, Screen } from '../types';
 
 interface Props {
   code: string;
@@ -21,39 +21,57 @@ interface Props {
 }
 
 export function RoomScreen({ code, onNavigate }: Props) {
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick((n) => n + 1);
-
-  const room = getRoom(code);
-  const voterId = getVoterId();
-  const closed = isClosed(code);
-  const isOwner = room?.ownerId === voterId;
-  const myVotedId = room?.votes.find((v) => v.voterId === voterId)?.candidateId;
-  const results = getResults(code);
-  const totalVotes = room?.votes.length ?? 0;
-  const maxVotes = results[0]?.votes ?? 0;
-
+  const [room, setRoom] = useState<Room | null | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  const voterId = getVoterId();
 
   useEffect(() => {
-    if (closed || !room?.deadline) return;
-    const timer = setInterval(() => {
-      if (isClosed(code)) {
-        refresh();
-        clearInterval(timer);
-      }
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [code, closed, room?.deadline, tick]);
+    let stopped = false;
+    let timer: ReturnType<typeof setInterval>;
 
-  if (!room) {
+    async function doRefresh() {
+      if (stopped) return;
+      try {
+        const r = await getRoom(code);
+        if (stopped) return;
+        setRoom(r);
+        if (r && (r.closed || (r.deadline && Date.now() >= r.deadline))) {
+          stopped = true;
+          clearInterval(timer);
+        }
+      } catch {
+        // 오류 시 폴링 계속
+      }
+    }
+
+    doRefresh();
+    timer = setInterval(doRefresh, 4000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [code]);
+
+  if (room === undefined) {
     return (
       <div>
         <TopNavigation
           leading={
-            <TopNavigationBackButton
-              onClick={() => onNavigate({ type: 'home' })}
-            />
+            <TopNavigationBackButton onClick={() => onNavigate({ type: 'home' })} />
+          }
+          content="로딩 중..."
+        />
+        <div style={{ padding: 40, textAlign: 'center', color: '#8B95A1' }}>잠시만 기다려 주세요.</div>
+      </div>
+    );
+  }
+
+  if (room === null) {
+    return (
+      <div>
+        <TopNavigation
+          leading={
+            <TopNavigationBackButton onClick={() => onNavigate({ type: 'home' })} />
           }
           content="방을 찾을 수 없음"
         />
@@ -63,6 +81,13 @@ export function RoomScreen({ code, onNavigate }: Props) {
       </div>
     );
   }
+
+  const closed = isClosed(room);
+  const isOwner = room.ownerId === voterId;
+  const myVotedId = room.votes.find((v) => v.voterId === voterId)?.candidateId;
+  const results = getResults(room);
+  const totalVotes = room.votes.length;
+  const maxVotes = results[0]?.votes ?? 0;
 
   async function copyCode() {
     try {
@@ -74,15 +99,25 @@ export function RoomScreen({ code, onNavigate }: Props) {
     }
   }
 
-  function handleVote(candidateId: string) {
+  async function handleVote(candidateId: string) {
     if (closed) return;
-    vote(code, voterId, candidateId);
-    refresh();
+    try {
+      await vote(code, voterId, candidateId);
+      const r = await getRoom(code);
+      setRoom(r);
+    } catch {
+      // 오류 무시 (폴링이 복구)
+    }
   }
 
-  function handleClose() {
-    closeRoom(code);
-    refresh();
+  async function handleClose() {
+    try {
+      await closeRoom(code, voterId);
+      const r = await getRoom(code);
+      setRoom(r);
+    } catch {
+      // 오류 무시
+    }
   }
 
   const deadlineLabel = (() => {
@@ -99,9 +134,7 @@ export function RoomScreen({ code, onNavigate }: Props) {
     <div style={{ paddingBottom: closed ? 32 : 100 }}>
       <TopNavigation
         leading={
-          <TopNavigationBackButton
-            onClick={() => onNavigate({ type: 'home' })}
-          />
+          <TopNavigationBackButton onClick={() => onNavigate({ type: 'home' })} />
         }
         content={
           <button
@@ -134,9 +167,7 @@ export function RoomScreen({ code, onNavigate }: Props) {
           alignItems: 'center',
         }}
       >
-        <span style={{ fontSize: 13, color: '#8B95A1' }}>
-          총 {totalVotes}표
-        </span>
+        <span style={{ fontSize: 13, color: '#8B95A1' }}>총 {totalVotes}표</span>
         {closed ? (
           <span
             style={{
@@ -160,7 +191,6 @@ export function RoomScreen({ code, onNavigate }: Props) {
       {/* 후보 목록 */}
       <div style={{ padding: '0 0' }}>
         {closed ? (
-          // 결과 보기
           <>
             <div
               style={{
@@ -277,7 +307,6 @@ export function RoomScreen({ code, onNavigate }: Props) {
             </div>
           </>
         ) : (
-          // 투표 진행 중
           <>
             <div
               style={{
@@ -319,9 +348,7 @@ export function RoomScreen({ code, onNavigate }: Props) {
                         width: 22,
                         height: 22,
                         borderRadius: '50%',
-                        border: isMyVote
-                          ? '6px solid #3182F6'
-                          : '2px solid #D1D6DB',
+                        border: isMyVote ? '6px solid #3182F6' : '2px solid #D1D6DB',
                         flexShrink: 0,
                         transition: 'border 0.2s',
                       }}
@@ -336,9 +363,7 @@ export function RoomScreen({ code, onNavigate }: Props) {
                     >
                       {r.name}
                     </span>
-                    <span style={{ fontSize: 14, color: '#8B95A1' }}>
-                      {r.votes}표
-                    </span>
+                    <span style={{ fontSize: 14, color: '#8B95A1' }}>{r.votes}표</span>
                   </div>
                   <div
                     style={{
