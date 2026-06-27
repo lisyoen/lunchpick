@@ -75,18 +75,46 @@ cp .env.example .env
 
 ## 4. 빌드
 
+### 로컬 빌드 (개발 확인용)
+
 ```bash
 npm run build
 # → dist/ 에 웹 번들 생성
 # → lunchpick.ait 번들 생성 (콘솔 업로드용)
 ```
 
-> **제출 전**: 운영 백엔드 URL이 확정되면 `VITE_API_BASE=https://<운영-URL> npm run build`로 재빌드 후 `.ait` 파일을 콘솔에 업로드하세요.
-
 빌드 산출물:
 
 - `dist/` — Vite 빌드 결과 + RN 번들
 - `lunchpick.ait` — 앱인토스 콘솔 제출용 번들 (git 미추적)
+
+### 운영 빌드 (.ait 콘솔 제출용)
+
+공개 HTTPS API 가 준비된 상태에서 `VITE_API_BASE` 를 지정해 빌드합니다.
+
+```bash
+# 공개 HTTPS API URL 을 환경변수로 주입해 빌드
+VITE_API_BASE=https://<your-public-api-host> npm run build
+# → dist/ + lunchpick.ait 생성 (운영 API URL baked-in)
+```
+
+또는 `.env.production` 파일을 생성(git 미추적)해 사용할 수도 있습니다:
+
+```bash
+echo "VITE_API_BASE=https://<your-public-api-host>" > .env.production
+npm run build
+```
+
+**제출 전 체크리스트** (운영 빌드 → 실폰 검증 → 콘솔 업로드):
+
+- [ ] 로컬 개발 (`npm run dev:all`) 에서 기본 흐름 정상 확인
+- [ ] 공개 HTTPS API 동작 확인 (POST/GET `/api/rooms` 정상 응답)
+- [ ] `VITE_API_BASE=https://<your-public-api-host> npm run build` 성공 → `lunchpick.ait` 생성
+- [ ] 앱인토스 콘솔에 `.ait` 업로드
+- [ ] "테스트하기" QR 로 실폰 진입
+- [ ] 실폰에서 방 생성 → 코드 공유 → 참여 → 투표 → 마감 → 결과 확인
+- [ ] 다기기 동기화 (4초 폴링) 정상 확인
+- [ ] 검토 요청 제출
 
 ---
 
@@ -104,13 +132,17 @@ npm run build
 ## 6. 제출 전 체크리스트
 
 - [ ] `granite.config.ts` `brand.icon` URL 입력 완료
-- [ ] 운영 백엔드 URL로 `VITE_API_BASE` 설정 후 `npm run build` → `lunchpick.ait` 재생성
-- [ ] 샌드박스 앱에서 `intoss://lunchpick` 진입 확인
-- [ ] 방 만들기 → 코드 표시 → 투표 → 마감 → 결과 흐름 정상
+- [ ] 로컬 테스트 (`npm run dev:all`) 에서 기본 흐름 정상 확인
+- [ ] 공개 HTTPS API 준비 완료 (POST/GET `/api/rooms` 응답 확인)
+- [ ] `VITE_API_BASE=https://<your-public-api-host> npm run build` → `lunchpick.ait` 생성
+- [ ] 앱인토스 콘솔에 `.ait` 업로드
+- [ ] "테스트하기" QR 로 실폰 진입 확인 (`intoss://lunchpick`)
+- [ ] 실폰에서 방 생성 → 코드 공유 → 참여 → 투표 → 마감 → 결과 흐름 정상
 - [ ] 1인 1표 변경/취소 동작 확인
-- [ ] 다기기 공유 테스트 (단톡방 코드 공유 → 다른 기기에서 참여 → 투표 동기화)
+- [ ] 다기기 동기화 테스트 (단톡방 코드 공유 → 다른 기기에서 참여 → 투표 동기화)
 - [ ] 모바일 레이아웃 (iOS + Android)
 - [ ] TDS 컴포넌트 라이트 모드 확인
+- [ ] 검토 요청 제출
 
 ---
 
